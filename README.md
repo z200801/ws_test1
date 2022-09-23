@@ -1,9 +1,9 @@
 # ws_test1
 
-Useful url's
-https://www.digitalocean.com/community/tutorials/how-to-install-and-configure-ansible-on-ubuntu-20-04 \\
-http://snakeproject.ru/rubric/article.php?art=ansible_19.08.2019
-https://www.cyberciti.biz/faq/how-to-set-up-ssh-keys-on-linux-unix/
+Useful url's \
+https://www.digitalocean.com/community/tutorials/how-to-install-and-configure-ansible-on-ubuntu-20-04 \
+http://snakeproject.ru/rubric/article.php?art=ansible_19.08.2019 \
+https://www.cyberciti.biz/faq/how-to-set-up-ssh-keys-on-linux-unix 
 
 Script create some 
  folders: 
@@ -24,5 +24,17 @@ Need:
   Installing vagrant, ansible
   
 Work step
-
-  - 
+  Maked:
+  - Install: vagrant for libvirt, ansible
+  - Download voagrant box ubuntu 20.04
+  - Create Vagrantfile with some parameters, such as cpus, memory and set ip
+  - Start vagrant box -> cd to $VM && vagrant up
+  - copy ssh key to VM (need entering password for vagrant user: vagrant)
+  - add ssh key to ~/.ssh/authorized_keys (need entering password for vagrant user: vagrant)
+  - Now we can using ssh key access to servers
+  - Runnig sshd_modify.sh script for modify /etc/ssh/sshd_config file. Change port to 1234, access only keys and restart sshd service
+  - Now access to servers only ssh keys
+ To do:
+  - add ssh key to root user [/root/.ssh/authorized_keys]
+  - remove from servers user: [vagrant]
+  - install 
