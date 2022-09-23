@@ -75,11 +75,11 @@ EOF
 
 ###########################
 # 3. Create new Vagrantfile
-cat >"Vagrantfile"<<- 'EOF'
+cat >"Vagrantfile"<<- EOF
 Vagrant.configure("2") do |config|
  config.vm.define :test_ubuntu_2004 do |tm1|
   tm1.vm.box = "generic/ubuntu2004"
-  tm1.vm.network :private_network, :ip=> "192.168.121.201"
+  tm1.vm.network :private_network, :ip=> "${ip_vm1}"
 end
   config.vm.provider :libvirt do |v|
     v.memory = 1024
