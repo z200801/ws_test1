@@ -34,7 +34,8 @@ Script create some
   - add ssh key to ~/.ssh/authorized_keys (need entering password for vagrant user: vagrant)
   - Now we can using ssh key access to servers
   - Runnig sshd_modify.sh script for modify /etc/ssh/sshd_config file. Change port to 1234, access only keys and restart sshd service
-  - Now access to servers only ssh keys\
+  - Now access to servers only ssh keys
+  - remake: 1st ssh conection with login:password
 #### To do:
   - add ssh key to root user [/root/.ssh/authorized_keys]
   - remove from servers user: [vagrant]
