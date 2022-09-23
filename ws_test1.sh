@@ -1,16 +1,11 @@
 #!/bin/sh
 
 #
-# Url's:
-# https://www.digitalocean.com/community/tutorials/how-to-install-and-configure-ansible-on-ubuntu-20-04
-# http://snakeproject.ru/rubric/article.php?art=ansible_19.08.2019
-# https://www.cyberciti.biz/faq/how-to-set-up-ssh-keys-on-linux-unix/
-
 # Ansible group name
 ansible_gp_name="servers"
 
 # Folder where are stored VM (Vagrantfile)
-vm_dir="/media/k231/vm/vagrant/ubuntu-test"
+vm_dir="/mnt/vm/vagrant/ubuntu-test"
 
 # ip VM
 ip_vm1="192.168.121.201"
