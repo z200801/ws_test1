@@ -15,6 +15,7 @@ ssh_key_file="~/.ssh/id_rsa_ansible.pub"
 
 # Initial vagrant user
 vm_user_init="vagrant"
+vm_user_passwd="vagrant"
 
 ssh_dest_key_file="/home/${vm_user_init}/.ssh/id_rsa_ansible.pub"
 
@@ -143,7 +144,7 @@ mkdir "${registry_dir}"
 
 cat >"${registry_dir}/${rg_fl1}"<<- EOF
 [servers]
-server1 ansible_host="${ip_vm1}" ansible_port=22 ansible_user=${vm_user_init}
+server1 ansible_host="${ip_vm1}" ansible_port=22 ansible_ssh_user=${vm_user_init} ansible_ssh_pass=${vm_user_passwd}
 
 [all:vars]
 ansible_python_interpreter=/usr/bin/python3
@@ -173,15 +174,14 @@ cat >"${pb_scripts}"<<- EOF
 #!/bin/sh
 
 # Copy rsa_pub file to servers
-ansible-playbook ${playbooks_dir}/${pb_ssh_keys} -i ${registry_dir}/${rg_fl1} --ask-pass
+ansible-playbook ${playbooks_dir}/${pb_ssh_keys} -i ${registry_dir}/${rg_fl1}
 
 # Add key file to authorized_keys
 ansible ${ansible_gp_name} \\
     -i ${registry_dir}/${rg_fl1} \\
     -b --become-user=${vm_user_init} \\
     -m shell \\
-    -a "cat ${ssh_key_file}>>~/.ssh/authorized_keys" \\
-    --ask-pass
+    -a "cat ${ssh_key_file}>>~/.ssh/authorized_keys"
 
 # Now we make use ansible without remote passwords
 # Copy script for modify /etc/ssh/sshd_config
