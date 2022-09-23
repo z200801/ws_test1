@@ -1,7 +1,7 @@
 # ws_test1
 
 Useful url's
-https://www.digitalocean.com/community/tutorials/how-to-install-and-configure-ansible-on-ubuntu-20-04
+https://www.digitalocean.com/community/tutorials/how-to-install-and-configure-ansible-on-ubuntu-20-04 \\
 http://snakeproject.ru/rubric/article.php?art=ansible_19.08.2019
 https://www.cyberciti.biz/faq/how-to-set-up-ssh-keys-on-linux-unix/
 
