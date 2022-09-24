@@ -1,17 +1,27 @@
 #!/bin/sh
 
 #
+# Url's:
+# https://www.digitalocean.com/community/tutorials/how-to-install-and-configure-ansible-on-ubuntu-20-04
+# http://snakeproject.ru/rubric/article.php?art=ansible_19.08.2019
+# https://www.cyberciti.biz/faq/how-to-set-up-ssh-keys-on-linux-unix/
+
+# CSF
+# https://vps.ua/wiki/configserver-security-and-firewall/
+
+
 # Ansible group name
 ansible_gp_name="servers"
 
 # Folder where are stored VM (Vagrantfile)
-vm_dir="/mnt/vm/vagrant/ubuntu-test"
+vm_dir0="/media/k231/vm/vagrant"
+vm_dir="${vm_dir0}/ubuntu-test"
 
 # ip VM
 ip_vm1="192.168.121.201"
 
 # Set rsa file for ssh key access to ansible servers
-ssh_key_file="~/.ssh/id_rsa_ansible.pub"
+ssh_key_file="/home/user/.ssh/id_rsa.pub"
 
 # Initial vagrant user
 vm_user_init="vagrant"
@@ -30,7 +40,8 @@ rg_fl1="hosts"
 # Playbooks files
 playbooks_dir="playbooks"
 pb_scripts="_run_playbooks.sh"
-pb_ssh_keys="copy_ssh_keys.yml"
+pb_ssh_key_u="copy_ssh_key_user.yml"
+pb_ssh_key_r="copy_ssh_key_root.yml"
 pb_nginx="nginx.yml"
 pb_sshd_mod="sshd_mod.yml"
 
@@ -40,6 +51,10 @@ sshd_mod="sshd_modify.sh"
 
 files2copy="${i1_init} _2_vagrant_init_vm.sh Vagrantfile ${pb_scripts}"
 dir2copy="${playbooks_dir} ${registry_dir} ${scripts_dir}"
+
+# lib_virt pool parameters
+_libvirt_pool1_dir="${vm_dir0}/img"
+_libvirt_pool1_name="vagrant_images"
 
 ###########################
 make_init_files()
@@ -93,30 +108,85 @@ EOF
 # 4. Create playbooks
 mkdir "${playbooks_dir}"
 
-cat >"${playbooks_dir}/${pb_ssh_keys}"<<- EOF
+# Create yaml file copy ssh key for user
+cat >"${playbooks_dir}/${pb_ssh_key_u}"<<- EOF
 ---
 - hosts: ${ansible_gp_name}
+  vars:
+    ssh_key_file: ${ssh_key_file}
+    ssh_user_dir: /home/${vm_user_init}/.ssh
+
   tasks:
-  - name: Copy ssh pub key file to servers
+  - name: create directory user .ssh
+    file:
+      path: '{{ ssh_user_dir }}'
+      state: directory
+      owner: vagrant
+      group: vagrant
+      mode: '0700'
+
+  - name: Copy ssh pub key file to servers user vagrant
     copy:
-      src: /home/user/.ssh/id_rsa.pub
-      dest: /home/${vm_user_init}/.ssh/id_rsa_ansible.pub
-      owner: ${vm_user_init}
-      group: ${vm_user_init}
-      mode: '0644'
+      src: '{{ ssh_key_file }}'
+      dest: '{{ ssh_user_dir }}/authorized_keys'
+      owner: vagrant
+      group: vagrant
+      mode: '0600'
+EOF
+# Create yaml file copy ssh key for root
+cat >"${playbooks_dir}/${pb_ssh_key_r}"<<- EOF
+---
+- hosts: ${ansible_gp_name}
+  become: yes
+  vars:
+    ssh_key_file: ${ssh_key_file}
+    ssh_root_dir: /root/.ssh
+
+  tasks:
+  - name: create directory /root/.ssh
+    become_user: root
+    file:
+      path: '{{ ssh_root_dir }}'
+      state: directory
+      owner: root
+      group: root
+      mode: '0700'
+
+  - name: Copy ssh pub key file to servers user root
+    become_user: root
+    copy:
+      src: '{{ ssh_key_file }}'
+      dest: '{{ ssh_root_dir }}/authorized_keys'
+      owner: root
+      group: root
+      mode: '0600'
 EOF
 
 cat >"${playbooks_dir}/${pb_sshd_mod}"<<- EOF
 ---
 - hosts: ${ansible_gp_name}
+  become: yes
+  vars:
+       sshd_cfg: /etc/ssh/sshd_config
+       ssh_port: 1234
   tasks:
-  - name: Copy sshd modify script to servers
-    copy:
-      src: ../${scripts_dir}/${sshd_mod}
-      dest: /home/${vm_user_init}/${sshd_mod}
-      owner: ${vm_user_init}
-      group: ${vm_user_init}
-      mode: '0744'
+    - name: sshd change port 22 to port 1234
+      replace:
+        path: "{{ sshd_cfg }}"
+        regexp: '.*Port\s.*'
+        replace: 'Port {{ ssh_port }}'
+
+    - name: sshd change PasswordAuthentication
+      replace:
+        path: "{{ sshd_cfg }}"
+        regexp: '.*PasswordAuthentication\s(yes|no)'
+        replace: 'PasswordAuthentication no'
+      notify:
+         - restart sshd
+
+  handlers:
+    - name: restart sshd
+      service: name=ssh state=restarted
 EOF
 
 cat >"${playbooks_dir}/${pb_nginx}"<<- EOF
@@ -126,10 +196,10 @@ cat >"${playbooks_dir}/${pb_nginx}"<<- EOF
  
   tasks:
 
-   - name: install nginx
+  - name: install nginx
     apt: name=nginx update_cache=yes
 
-    - name: start nginx
+  - name: start nginx
     service: name=nginx state=started
 
   - name: stop nginx
@@ -156,44 +226,53 @@ EOF
 #            PasswordAuthentication (yes|no) PasswordAuthentication no
 
 mkdir "${scripts_dir}"
-cat >"${scripts_dir}/${sshd_mod}"<<- "EOF"
-#!/bin/sh
-
-sudo cp /etc/ssh/sshd_config /etc/ssh/sshd_config.origin
-src1=$(grep "Port\s[0-9]*" /etc/ssh/sshd_config)
-sudo sed -i "s/${src1}/Port 1234/g" /etc/ssh/sshd_config
-sudo sed -i "s/PermitRootLogin\s[(yes|no)]*//g" /etc/ssh/sshd_config
-sudo echo "PermitRootLogin without-password">>/etc/ssh/sshd_config
-sudo sed -i "s/.*PasswordAuthentication\s[(yes|no)]*/PasswordAuthentication no/g" /etc/ssh/sshd_config
-
-sudo systemctl restart ssh
-EOF
+#cat >"${scripts_dir}/${sshd_mod}"<<- "EOF"
+##!/bin/sh
+#
+#sudo cp /etc/ssh/sshd_config /etc/ssh/sshd_config.origin
+#src1=$(grep "Port\s[0-9]*" /etc/ssh/sshd_config)
+#sudo sed -i "s/${src1}/Port 1234/g" /etc/ssh/sshd_config
+#sudo sed -i "s/PermitRootLogin\s[(yes|no)]*//g" /etc/ssh/sshd_config
+#sudo echo "PermitRootLogin without-password">>/etc/ssh/sshd_config
+#sudo sed -i "s/.*PasswordAuthentication\s[(yes|no)]*/PasswordAuthentication no/g" /etc/ssh/sshd_config
+#
+#sudo systemctl restart ssh
+#EOF
 
 # 7. Create shell script for running ansible playbooks
 cat >"${pb_scripts}"<<- EOF
 #!/bin/sh
 
-# Copy rsa_pub file to servers
-ansible-playbook ${playbooks_dir}/${pb_ssh_keys} -i ${registry_dir}/${rg_fl1}
+echo "Add ssh key to local repository"
+nm1=$(grep "${ip_vm1"} /etc/hosts|cut -d ' ' -f2)
+ssh-keyscan "${ip_vm1}">> ~/.ssh/known_hosts
+ssh-keyscan "${nm1}">> ~/.ssh/known_hosts
+
+# Copy rsa_pub file to servers for user and root
+ansible-playbook ${playbooks_dir}/${pb_ssh_key_u} -i ${registry_dir}/${rg_fl1}
+ansible-playbook ${playbooks_dir}/${pb_ssh_key_r} -i ${registry_dir}/${rg_fl1}
 
 # Add key file to authorized_keys
-ansible ${ansible_gp_name} \\
-    -i ${registry_dir}/${rg_fl1} \\
-    -b --become-user=${vm_user_init} \\
-    -m shell \\
-    -a "cat ${ssh_key_file}>>~/.ssh/authorized_keys"
+#ansible ${ansible_gp_name} \\
+#    -i ${registry_dir}/${rg_fl1} \\
+#    -b --become-user=${vm_user_init} \\
+#    -m shell \\
+#    -a "cat ${ssh_key_file}>>~/.ssh/authorized_keys"
 
 # Now we make use ansible without remote passwords
 # Copy script for modify /etc/ssh/sshd_config
 ansible-playbook ${playbooks_dir}/${pb_sshd_mod} -i ${registry_dir}/${rg_fl1}
 # Run script
-ansible ${ansible_gp_name} \\
-    -b \
-    -i ${registry_dir}/${rg_fl1} \\
-    -m shell \\
-    -a "/home/vagrant/sshd_modify.sh"
+#ansible ${ansible_gp_name} \\
+#    -b \
+#    -i ${registry_dir}/${rg_fl1} \\
+#    -m shell \\
+#    -a "/home/vagrant/sshd_modify.sh"
 
-sed -i 's/ansible_port=22/ansible_port=1234/' "${registry_dir}/${rg_fl1}"
+# Change port, replace user and password in inventory file
+#sed -i 's/ansible_port=22/ansible_port=1234/' "${registry_dir}/${rg_fl1}"
+#sed -i 's/ansible_ssh_user=vagrant/ansible_ssh_user=root/' "${registry_dir}/${rg_fl1}"
+#sed -i 's/ansible_ssh_pass=vagrant//' "${registry_dir}/${rg_fl1}"
 
 # Another time
 #ansible-playbook ${playbooks_dir}/${pb_nginx} -i ${registry_dir}/${rg_fl1}
@@ -221,13 +300,76 @@ _ssh_keys_remove()
     nm1=$(grep ${ip_vm1} /etc/hosts|cut -d ' ' -f2)
     ssh-keygen -f "${HOME}/.ssh/known_hosts" -R "${ip_vm1}"
     ssh-keygen -f "${HOME}/.ssh/known_hosts" -R "${nm1}"
+}
+_ssh_keys_add()
+{
+    nm1=$(grep ${ip_vm1} /etc/hosts|cut -d ' ' -f2)
     ssh-keyscan "${ip_vm1}">> ~/.ssh/known_hosts
     ssh-keyscan "${nm1}">> ~/.ssh/known_hosts
 }
 
+_libvirt_pool_init()
+{
+# Check if pool exist
+#echo "_libvirt_pool1_dir=[${_libvirt_pool1_dir}]"
+#echo "_libvirt_pool1_name=[${_libvirt_pool1_name}]"
+
+g_p1=$(virsh pool-list --all|grep "${_libvirt_pool1_name}"|sed 's/^\s//g')
+#echo "${g_p1}"
+echo "-:Check pool: [${_libvirt_pool1_name}]"
+if [ -n "${g_p1}" ]; then
+  p_state=$(echo "${g_p1}"|awk '{print $2}')
+  p_autostart=$(echo "${g_p1}"|awk '{print $3}')
+#  echo "p_state=[${p_state}]"
+#  echo "p_autostart=[${p_autostart}]"
+# Check and activate pool
+  if [ "${p_state}" = "inactive" ]; then echo "   -Activate pool"; virsh pool-start "${_libvirt_pool1_name}";
+    else echo "   -Pool activated"
+  fi
+  if [ "${p_autostart}" = "no" ]; then echo "   -Autostart pool";virsh pool-autostart "${_libvirt_pool1_name}";
+    else echo "   -Pool autostart"
+  fi
+  unset p_state
+  unset p_autostart
+else
+# Create full pool: folder, add pool, activate and autostart
+  echo "   Create full pool: folder, add pool, activate and autostart"
+  mkdir -p "${_libvirt_pool1_dir}" || echo "Error create folder: [${_libvirt_pool1_dir}]"
+  echo "    -:define pool"
+  virsh pool-define-as "${_libvirt_pool1_name}" dir - - - - "${_libvirt_pool1_dir}"
+  ret_c=$(virsh pool-list --all --name|grep "${_libvirt_pool1_name}")
+  if [ -n "${ret_c}" ]; then echo "Poll: [${_libvirt_pool1_name}] create at folder [${_libvirt_pool1_dir}]"
+    else echo "Error create pool: [${_libvirt_pool1_name}] at [${_libvirt_pool1_dir}]"
+  fi
+
+  unset ret_c
+
+  echo "    -:build pool"
+  virsh pool-build "${_libvirt_pool1_name}"
+  echo "    -:activate pool"
+  virsh pool-start "${_libvirt_pool1_name}"
+  echo "    -:autostart pool"
+  virsh pool-autostart "${_libvirt_pool1_name}"
+
+fi
+ unset g_p1
+}
+_libvirt_pool_delete()
+{
+if [ -z "${1}" ]; then return 1; else pool1_name="${1}"; fi
+    g_ret=$(virsh pool-list --all --name|grep "${pool1_name}")
+  if [ -n "${g_ret}" ]; then
+    echo "Delete poll: [${pool1_name}]"
+    virsh pool-destroy "${pool1_name}"
+    virsh pool-delete "${pool1_name}"
+    virsh pool-undefine "${pool1_name}"
+  else echo "Error: not found pool: [${pool1_name}]"
+  fi
+}
+
 ##########################
 # Main sections
-_ssh_keys_remove
+#_ssh_keys_remove
 make_init_files
 #exit 0
 ###########################
