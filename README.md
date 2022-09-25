@@ -36,9 +36,11 @@ Script create some
   - Runnig sshd_modify.sh script for modify /etc/ssh/sshd_config file. Change port to 1234, access only keys and restart sshd service
   - Now access to servers only ssh keys
   - remake: 1st ssh conection with login:password
-#### To do:
+  - remake: 1st ssh connection for user [vagrant] witth password stored in inventory file registry/hosts
   - add ssh key to root user [/root/.ssh/authorized_keys]
   - remove from servers user: [vagrant]
+ 
+#### To do:
   - install & configure [csf] with according to requirements
   - install last versions: [nginx], [php-fpm 8.1], [MySql]
   - install last versions & configure [wp] with according to requirements
@@ -51,4 +53,18 @@ Script create some
       - copy all files in folder [scripts] to servers
       - runs scripts from folder [scripts] 
       - delete scripts folder [scripts] 
+----
+#### Files:
+##### Inventory hosts [registry/]
+ - hosts: contains hosts with ssh: port, user
+##### Playbooks [playbooks/]
+ - copy_ssh_key_user.yml: create dir ~/.ssh and copy ssh key for user [vagrant]. This file is not running, because we are later delete this user
+ - copy_ssh_key_root.yml: create dir ~/.ssh and copy ssh key for root
+ - sshd_mod.yml: modify /etc/ssh/sshd_config : port 1234, PasswordAuthentication no
+ - user_del.yml: delete user [vagrant]
+##### Scripts [scripts/]
+ - contains scripts files for running in hosts
  
+ 
+ 
+
