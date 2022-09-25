@@ -29,10 +29,17 @@ Script create some
   - Install: vagrant for libvirt, ansible
   - Download voagrant box ubuntu 20.04
   - Create Vagrantfile with some parameters, such as cpus, memory and set ip
-  - Start vagrant box -> cd to $VM && vagrant up
-  - copy ssh key to VM (need entering password for vagrant user: vagrant)
-  - add ssh key to ~/.ssh/authorized_keys (need entering password for vagrant user: vagrant)
-  - Now we can using ssh key access to servers
+  - Start vagrant box -> cd to $VM && vagrant up. Standart login:pass [vagrant:vagrant]
+  - Goto VM folder
+  - run script _run_playbooks.sh
+    - add ssh public key to localmachine
+    - copy ssh key for root to [servers] and make file /root/.ssh/authorized_keys
+    - change inventory file [registry/hosts] for user: root, remove ssh password for user: [vagrant]
+    - delete from [servers] initial user: [vagrant]
+    - modify /etc/ssh/sshd_config for: port 1234 and allow access only ssh keys
+    - change inventory file [registry/hosts] for port 1234
+    - install nginx from repository
+  - Now we can using ssh key access to servers only for root accounts
   - Runnig sshd_modify.sh script for modify /etc/ssh/sshd_config file. Change port to 1234, access only keys and restart sshd service
   - Now access to servers only ssh keys
   - remake: 1st ssh conection with login:password
@@ -55,6 +62,7 @@ Script create some
       - delete scripts folder [scripts] 
 ----
 #### Files:
+ - _run_playbooks.sh: script for running ansible playbooks
 ##### Inventory hosts [registry/]
  - hosts: contains hosts with ssh: port, user
 ##### Playbooks [playbooks/]
