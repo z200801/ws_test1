@@ -44,12 +44,13 @@ pb_ssh_key_r="copy_ssh_key_root.yml"
 pb_nginx="nginx.yml"
 pb_sshd_mod="sshd_mod.yml"
 pb_user_del="user_del.yml"
+pb_system_upgr="system_upgrade.yml"
 
 # Script files
 scripts_dir="skripts"
 #sshd_mod="sshd_modify.sh"
 
-files2copy="${i1_init} _2_vagrant_init_vm.sh Vagrantfile ${pb_scripts}"
+files2copy="${i1_init} ${i2_vagrant} Vagrantfile ${pb_scripts}"
 dir2copy="${playbooks_dir} ${registry_dir} ${scripts_dir}"
 
 # lib_virt pool parameters
@@ -193,8 +194,6 @@ EOF
 cat >"${playbooks_dir}/${pb_nginx}"<<- EOF
 ---
 - hosts: ${ansible_gp_name}
-  become: yes
- 
   tasks:
 
   - name: install nginx
@@ -217,6 +216,18 @@ cat >"${playbooks_dir}/${pb_user_del}"<<- EOF
 
   - name: Execute the command in remote shell; whoami
     ansible.builtin.shell: userdel -r ${vm_user_init}
+EOF
+
+cat >"${playbooks_dir}/${pb_system_upgr}"<<- EOF
+---
+- hosts: servers
+  tasks:
+  - name: Update the repository cache, upgrade system, autoclean, autoremove
+    ansible.builtin.apt:
+      update_cache: yes
+      upgrade: yes
+      autoclean: yes
+      autoremove: yes
 EOF
 
 #########
@@ -262,27 +273,29 @@ ssh-keyscan "\${nm_ip1}">> ~/.ssh/known_hosts
 
 # Copy rsa_pub file to servers for root
 # Add ssh_key for root
-ansible-playbook ${playbooks_dir}/${pb_ssh_key_r} -i ${registry_dir}/${rg_fl1}
+ansible-playbook -i ${registry_dir}/${rg_fl1} ${playbooks_dir}/${pb_ssh_key_r}
 
 # Make changes in inventory file for use root user
 sed -i 's/ansible_ssh_user=${vm_user_init}/ansible_ssh_user=root/' "${registry_dir}/${rg_fl1}"
 sed -i 's/ansible_ssh_pass=${vm_user_passwd}//' "${registry_dir}/${rg_fl1}"
 
 # Delete initial user ${vm_user_init}
-#ansible-playbook ${playbooks_dir}/${pb_user_del} -i ${registry_dir}/${rg_fl1}
+#ansible-playbook -i ${registry_dir}/${rg_fl1} ${playbooks_dir}/${pb_user_del}
 
 # Add ssh_key for user: ${vm_user_init} only
-#ansible-playbook ${playbooks_dir}/${pb_ssh_key_u} -i ${registry_dir}/${rg_fl1}
+#ansible-playbook -i ${registry_dir}/${rg_fl1} ${playbooks_dir}/${pb_ssh_key_u}
 
 # Now we make use ansible without remote passwords
 # Copy script for modify /etc/ssh/sshd_config
-ansible-playbook ${playbooks_dir}/${pb_sshd_mod} -i ${registry_dir}/${rg_fl1}
+ansible-playbook -i ${registry_dir}/${rg_fl1} ${playbooks_dir}/${pb_sshd_mod}
 
 # Change port, replace user and password in inventory file
 sed -i 's/ansible_port=22/ansible_port=1234/' "${registry_dir}/${rg_fl1}"
 
 # Another time
-#ansible-playbook ${playbooks_dir}/${pb_nginx} -i ${registry_dir}/${rg_fl1}
+# Upgrade system
+#ansible-playbook -i ${registry_dir}/${rg_fl1} ${playbooks_dir}/${pb_system_upgr}
+#ansible-playbook -i ${registry_dir}/${rg_fl1} ${playbooks_dir}/${pb_nginx}
 EOF
 
 # 8. run scripts for modify sshd_config on a servers
