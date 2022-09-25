@@ -5,7 +5,7 @@ https://www.digitalocean.com/community/tutorials/how-to-install-and-configure-an
 http://snakeproject.ru/rubric/article.php?art=ansible_19.08.2019 \
 https://www.cyberciti.biz/faq/how-to-set-up-ssh-keys-on-linux-unix 
 
-Script create some
+Script [ws_test1.sh] create files and folders in local folder and copy this structure to [$vm_dir]
  folders: 
   * playbooks: playbooks yml files for ansible-playbooks
   * registry:  files with hostnames and users
@@ -15,7 +15,7 @@ Script create some
   * _1_init.sh: install - sshpass, ansible, libvirt-dev, libvirt-vagrant
                     download - vagrant box with ubuntu 20.04 for libvirt
   * _2_vagrant_init_vm.sh: initial script for making Vagrantfile [not need]
-  * _run_playbooks.sh: script running initial VM. Such as: copy and add ssh keys, modify sshd_config file [port 1234, access with ssh keys], install playbooks files
+  * _run_playbooks.sh: script for run playbooks for [servers]. Such as: copy ssh keys, modify sshd_config file [port 1234, access with ssh keys].
           
 ### Using:
   * Ubuntu: ansible server
@@ -70,6 +70,7 @@ Script create some
  - copy_ssh_key_root.yml: create dir ~/.ssh and copy ssh key for root
  - sshd_mod.yml: modify /etc/ssh/sshd_config : port 1234, PasswordAuthentication no
  - user_del.yml: delete user [vagrant]
+ - system_upgrade.yml: upgrade system
 ##### Scripts [scripts/]
  - contains scripts files for running in hosts
  
