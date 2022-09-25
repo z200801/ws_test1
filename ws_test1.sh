@@ -45,6 +45,7 @@ pb_nginx="nginx.yml"
 pb_sshd_mod="sshd_mod.yml"
 pb_user_del="user_del.yml"
 pb_system_upgr="system_upgrade.yml"
+pb_apt_autoremove="apt_autoremove.yml"
 
 # Script files
 scripts_dir="skripts"
@@ -226,10 +227,47 @@ cat >"${playbooks_dir}/${pb_system_upgr}"<<- EOF
     ansible.builtin.apt:
       update_cache: yes
       upgrade: yes
+
+  - name: autoclean, autoremove
+    ansible.builtin.apt:
       autoclean: yes
       autoremove: yes
 EOF
 
+cat >"${playbooks_dir}/${pb_apt_autoremove}"<<- EOF
+---
+- hosts: servers
+  pre_tasks:
+      - name: check usage space [/var/cache/apt/archives/] - before
+        shell: du -hs /var/cache/apt/archives/
+        register: check_storage_space_before
+
+      - name: print storage space
+        debug:
+         msg: "{{ check_storage_space_before.stdout_lines }}"
+
+      - name: apt autoremove check
+        command: apt-get -y --dry-run autoremove
+        register: apt_autoremove_output
+
+      - name: print apt autoremove packages
+        debug:
+          msg: "{{ apt_autoremove_output.stdout_lines }}"
+
+  tasks:
+      - name: autoremove unused packages
+        command: apt-get -y autoremove
+        changed_when: "'The following packages will be REMOVED' in apt_autoremove_output.stdout"
+
+  post_tasks:
+      - name: check usage space [/var/cache/apt/archives/] - after
+        shell: du -hs /var/cache/apt/archives/
+        register: check_storage_space_after
+
+      - name: print storage space
+        debug:
+         msg: "{{ check_storage_space_after.stdout_lines }}"
+EOF
 #########
 # 5. Create registry files
 mkdir "${registry_dir}"
@@ -292,9 +330,14 @@ ansible-playbook -i ${registry_dir}/${rg_fl1} ${playbooks_dir}/${pb_sshd_mod}
 # Change port, replace user and password in inventory file
 sed -i 's/ansible_port=22/ansible_port=1234/' "${registry_dir}/${rg_fl1}"
 
-# Another time
+## Another time
+
 # Upgrade system
 #ansible-playbook -i ${registry_dir}/${rg_fl1} ${playbooks_dir}/${pb_system_upgr}
+
+# apt clean
+#ansible-playbook -i ${registry_dir}/${rg_fl1} ${playbooks_dir}/${pb_apt_autoremove}
+
 #ansible-playbook -i ${registry_dir}/${rg_fl1} ${playbooks_dir}/${pb_nginx}
 EOF
 
