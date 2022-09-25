@@ -1,7 +1,8 @@
 #!/bin/sh
 
-#
+#######################
 # Url's:
+# https://docs.ansible.com/ansible/latest/collections/ansible/builtin/index.html
 # https://www.digitalocean.com/community/tutorials/how-to-install-and-configure-ansible-on-ubuntu-20-04
 # http://snakeproject.ru/rubric/article.php?art=ansible_19.08.2019
 # https://www.cyberciti.biz/faq/how-to-set-up-ssh-keys-on-linux-unix/
@@ -14,7 +15,7 @@
 ansible_gp_name="servers"
 
 # Folder where are stored VM (Vagrantfile)
-vm_dir0="/media/k231/vm/vagrant"
+vm_dir0="/mnt/vm/vagrant"
 vm_dir="${vm_dir0}/ubuntu-test"
 
 # ip VM
@@ -26,8 +27,6 @@ ssh_key_file="/home/user/.ssh/id_rsa.pub"
 # Initial vagrant user
 vm_user_init="vagrant"
 vm_user_passwd="vagrant"
-
-ssh_dest_key_file="/home/${vm_user_init}/.ssh/id_rsa_ansible.pub"
 
 # Init files
 i1_init="_1_init.sh"
@@ -44,10 +43,11 @@ pb_ssh_key_u="copy_ssh_key_user.yml"
 pb_ssh_key_r="copy_ssh_key_root.yml"
 pb_nginx="nginx.yml"
 pb_sshd_mod="sshd_mod.yml"
+pb_user_del="user_del.yml"
 
 # Script files
 scripts_dir="skripts"
-sshd_mod="sshd_modify.sh"
+#sshd_mod="sshd_modify.sh"
 
 files2copy="${i1_init} _2_vagrant_init_vm.sh Vagrantfile ${pb_scripts}"
 dir2copy="${playbooks_dir} ${registry_dir} ${scripts_dir}"
@@ -100,6 +100,7 @@ end
   config.vm.provider :libvirt do |v|
     v.memory = 1024
     v.cpus = 1
+    v.storage_pool_name = "vagrant_images"
     v.storage :file, :size => '8G', :type => 'qcow2'
     end
 end
@@ -209,6 +210,16 @@ cat >"${playbooks_dir}/${pb_nginx}"<<- EOF
     service: name=nginx state=restarted
 EOF
 
+cat >"${playbooks_dir}/${pb_user_del}"<<- EOF
+---
+- hosts: servers
+  tasks:
+
+  - name: Execute the command in remote shell; whoami
+    ansible.builtin.shell: userdel -r ${vm_user_init}
+EOF
+
+#########
 # 5. Create registry files
 mkdir "${registry_dir}"
 
@@ -244,35 +255,31 @@ cat >"${pb_scripts}"<<- EOF
 #!/bin/sh
 
 echo "Add ssh key to local repository"
-nm1=$(grep "${ip_vm1"} /etc/hosts|cut -d ' ' -f2)
-ssh-keyscan "${ip_vm1}">> ~/.ssh/known_hosts
-ssh-keyscan "${nm1}">> ~/.ssh/known_hosts
+ip1_vm="${ip_vm1}"
+nm_ip1=\$(grep "\${ip1_vm}" /etc/hosts|cut -d ' ' -f2)
+ssh-keyscan "\${ip1_vm}">> ~/.ssh/known_hosts
+ssh-keyscan "\${nm_ip1}">> ~/.ssh/known_hosts
 
-# Copy rsa_pub file to servers for user and root
-ansible-playbook ${playbooks_dir}/${pb_ssh_key_u} -i ${registry_dir}/${rg_fl1}
+# Copy rsa_pub file to servers for root
+# Add ssh_key for root
 ansible-playbook ${playbooks_dir}/${pb_ssh_key_r} -i ${registry_dir}/${rg_fl1}
 
-# Add key file to authorized_keys
-#ansible ${ansible_gp_name} \\
-#    -i ${registry_dir}/${rg_fl1} \\
-#    -b --become-user=${vm_user_init} \\
-#    -m shell \\
-#    -a "cat ${ssh_key_file}>>~/.ssh/authorized_keys"
+# Make changes in inventory file for use root user
+sed -i 's/ansible_ssh_user=${vm_user_init}/ansible_ssh_user=root/' "${registry_dir}/${rg_fl1}"
+sed -i 's/ansible_ssh_pass=${vm_user_passwd}//' "${registry_dir}/${rg_fl1}"
+
+# Delete initial user ${vm_user_init}
+#ansible-playbook ${playbooks_dir}/${pb_user_del} -i ${registry_dir}/${rg_fl1}
+
+# Add ssh_key for user: ${vm_user_init} only
+#ansible-playbook ${playbooks_dir}/${pb_ssh_key_u} -i ${registry_dir}/${rg_fl1}
 
 # Now we make use ansible without remote passwords
 # Copy script for modify /etc/ssh/sshd_config
 ansible-playbook ${playbooks_dir}/${pb_sshd_mod} -i ${registry_dir}/${rg_fl1}
-# Run script
-#ansible ${ansible_gp_name} \\
-#    -b \
-#    -i ${registry_dir}/${rg_fl1} \\
-#    -m shell \\
-#    -a "/home/vagrant/sshd_modify.sh"
 
 # Change port, replace user and password in inventory file
-#sed -i 's/ansible_port=22/ansible_port=1234/' "${registry_dir}/${rg_fl1}"
-#sed -i 's/ansible_ssh_user=vagrant/ansible_ssh_user=root/' "${registry_dir}/${rg_fl1}"
-#sed -i 's/ansible_ssh_pass=vagrant//' "${registry_dir}/${rg_fl1}"
+sed -i 's/ansible_port=22/ansible_port=1234/' "${registry_dir}/${rg_fl1}"
 
 # Another time
 #ansible-playbook ${playbooks_dir}/${pb_nginx} -i ${registry_dir}/${rg_fl1}
@@ -307,7 +314,6 @@ _ssh_keys_add()
     ssh-keyscan "${ip_vm1}">> ~/.ssh/known_hosts
     ssh-keyscan "${nm1}">> ~/.ssh/known_hosts
 }
-
 _libvirt_pool_init()
 {
 # Check if pool exist
@@ -316,7 +322,7 @@ _libvirt_pool_init()
 
 g_p1=$(virsh pool-list --all|grep "${_libvirt_pool1_name}"|sed 's/^\s//g')
 #echo "${g_p1}"
-echo "-:Check pool: [${_libvirt_pool1_name}]"
+echo " -:Check pool: [${_libvirt_pool1_name}]"
 if [ -n "${g_p1}" ]; then
   p_state=$(echo "${g_p1}"|awk '{print $2}')
   p_autostart=$(echo "${g_p1}"|awk '{print $3}')
@@ -369,8 +375,16 @@ if [ -z "${1}" ]; then return 1; else pool1_name="${1}"; fi
 
 ##########################
 # Main sections
-#_ssh_keys_remove
+
+# Remove old ssh keys for old VM
+_ssh_keys_remove
+
+# Create initial files
 make_init_files
+
+# Vagrant: check and init pool storage
+_libvirt_pool_init
+
 #exit 0
 ###########################
 
