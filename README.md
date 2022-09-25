@@ -71,6 +71,7 @@ Script [ws_test1.sh] create files and folders in local folder and copy this stru
  - sshd_mod.yml: modify /etc/ssh/sshd_config : port 1234, PasswordAuthentication no
  - user_del.yml: delete user [vagrant]
  - system_upgrade.yml: upgrade system
+ - apt_autoremove.yml: apt autoremove packages
 ##### Scripts [scripts/]
  - contains scripts files for running in hosts
  
